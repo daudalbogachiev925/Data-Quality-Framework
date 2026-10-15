@@ -20,4 +20,39 @@ df = pd.DataFrame({
 
 rules = [
     Rule("r1", "customer_id not null", "completeness", "customer_id", not_null, "critical"),
-    Rule("r2", "email
+    Rule("r2", "email not null", "completeness", "email", not_null, "high"),
+    Rule("r3", "email format", "validity", "email", matches_regex(r"^[\w\.\-]+@[\w\.\-]+\.\w+$"), "medium"),
+    Rule("r4", "age in range 18-100", "validity", "age", in_range(18, 100), "high"),
+    Rule("r5", "salary positive", "validity", "salary", is_positive, "critical"),
+    Rule("r6", "phone format", "validity", "phone", matches_regex(r"^\+7\d{10}$"), "medium"),
+]
+
+validator = DataValidator(rules)
+results = validator.validate(df)
+results.append(validator.validate_unique(df, "customer_id", "uq_customer", "critical"))
+
+score = compute_score(results)
+summary = summary_report(results, score)
+
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Overall Score", f"{score['score']}%")
+c2.metric("Grade", score["grade"])
+c3.metric("Passed", summary["passed"])
+c4.metric("Failed", summary["failed"])
+
+st.subheader("По dimensions")
+st.bar_chart(pd.Series(score["by_dimension"]))
+
+st.subheader("Результаты правил")
+st.dataframe(to_dataframe(results))
+
+st.subheader("❌ Failed Rules")
+failed = [r for r in results if r["status"] == "FAIL"]
+if failed:
+    for r in failed:
+        st.error(f"**{r['rule']}** ({r['column']}) — pass rate: {r['pass_rate']*100:.1f}% · severity: {r['severity']}")
+else:
+    st.success("Все правила пройдены!")
+
+st.subheader("Данные")
+st.dataframe(df.head(50))
